@@ -35,6 +35,20 @@ Execute **Firewallo** from a root shell and select an option from the configurat
 
 ---
 
+## 🧾 Accepted Traffic Logs
+
+Generated filter allow rules log accepted traffic by default. Set `ACCEPT_LOGS="off"` in `/etc/firewallo/firewallo.conf` to start without those `ACCEPTED ...` logs, or toggle them on a running firewall without a full restart:
+
+```bash
+firewallo accept-logs off
+firewallo accept-logs on
+firewallo accept-logs status
+```
+
+The `acceptlogs` main-menu entry provides the same hot enable/disable/status actions.
+
+---
+
 ## 🛠️ Build
 
 ### Local Build

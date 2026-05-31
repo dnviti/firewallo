@@ -103,6 +103,81 @@ iptables -A INPUT -d $dns -p udp --sport 53 -m limit --limit 10/minute --limit-b
 iptables -A INPUT -d $dns -p udp --sport 53 -j ACCEPT
 
 }
+
+firewallo_filter_chains() {
+    echo "lan2wan lan2dmz lan2lan lan2vpns lan2fw \
+wan2wan wan2dmz wan2lan wan2vpns wan2fw \
+dmz2wan dmz2dmz dmz2lan dmz2vpns dmz2fw \
+fw2wan fw2dmz fw2lan fw2vpns fw2fw \
+vpns2wan vpns2dmz vpns2lan vpns2vpns vpns2fw"
+}
+
+firewallo_accept_logs_enabled() {
+    case "${ACCEPT_LOGS:-on}" in
+        1|on|ON|yes|YES|true|TRUE|enable|ENABLE|enabled|ENABLED)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+firewallo_set_accept_logs_config() {
+    local value="$1"
+
+    if grep -q '^ACCEPT_LOGS=' "$DIRCONF/firewallo.conf" ; then
+        sed -i "s/^ACCEPT_LOGS=.*/ACCEPT_LOGS=\"$value\"/" "$DIRCONF/firewallo.conf"
+    else
+        printf '\n# Accepted traffic logging for generated filter allow rules (on/off).\nACCEPT_LOGS="%s"\n' "$value" >> "$DIRCONF/firewallo.conf"
+    fi
+
+    ACCEPT_LOGS="$value"
+    export ACCEPT_LOGS
+}
+
+firewallo_reload_filter_accept_rules() {
+    local dirbin="${DIRBIN:-/usr/local/firewallo/bin}"
+    local cat
+
+    for cat in $(firewallo_filter_chains) ; do
+        if [ "$NFT" != "" ] ; then
+            $NFT "flush chain ip filter $cat"
+        elif [ "$IPT" != "" ] ; then
+            $IPT -t filter -F "$cat"
+        fi
+        /bin/bash "$dirbin/filter/set.filter" "$DIRCONF/filter/$cat" "$DIRCONF/firewallo.conf" "$cat"
+    done
+}
+
+firewallo_accept_logs() {
+    local action="$1"
+
+    case "$action" in
+        on|ON|enable|ENABLE|enabled|ENABLED|yes|YES|true|TRUE|1)
+            firewallo_set_accept_logs_config "on"
+            firewallo_reload_filter_accept_rules
+            echo "Accepted traffic logs enabled."
+            ;;
+        off|OFF|disable|DISABLE|disabled|DISABLED|no|NO|false|FALSE|0)
+            firewallo_set_accept_logs_config "off"
+            firewallo_reload_filter_accept_rules
+            echo "Accepted traffic logs disabled."
+            ;;
+        status|STATUS|"")
+            if firewallo_accept_logs_enabled ; then
+                echo "Accepted traffic logs are enabled."
+            else
+                echo "Accepted traffic logs are disabled."
+            fi
+            ;;
+        *)
+            echo "Usage: firewallo accept-logs on|off|status"
+            return 1
+            ;;
+    esac
+}
+
 check_process_firewallo(){
 if  [ "$NFT" != "" ] ; then
 CHECK_START_NFT=$(ps ax | grep [f]irewallo.nft)

@@ -147,6 +147,34 @@ status () {
 less $DIRCONF/status.log
 }
 
+# Funzione per abilitare/disabilitare a caldo i log ACCEPTED del filtro
+acceptlogs () {
+check_process_firewallo || return 1
+firewallo_accept_logs "$1"
+}
+
+# Menu per configurare i log ACCEPTED del filtro
+acceptlogs_menu () {
+banner_show
+firewallo_accept_logs status
+MENU1="enable disable status exit"
+select opt1 in $MENU1 ; do
+    if [ "$opt1" = "enable" ] ; then
+        acceptlogs on
+    elif [ "$opt1" = "disable" ] ; then
+        acceptlogs off
+    elif [ "$opt1" = "status" ] ; then
+        firewallo_accept_logs status
+    elif [ "$opt1" = "exit" ] ; then
+        main
+    fi
+    echo "Press Any key to continue ...."
+    read OK
+    acceptlogs_menu
+    return
+ done
+}
+
 #Funzione di list delle regole 
 rules () {
 if [ "$IPT" != "" ]  ;then
@@ -509,7 +537,7 @@ if [[ "$NFT" = "" && "$IPT" = "" ]] ;then
 fi
 
 #Opzioni del menu
-MENU="networking sysctl conf filter nat mangle start stop restart reset route networkdpi status rulesview saveconf nft-iptables logs export_conf restore_conf exit"
+MENU="networking sysctl conf filter nat mangle start stop restart reset route networkdpi status rulesview saveconf nft-iptables logs acceptlogs export_conf restore_conf exit"
 select opt in $MENU ; do 
 	if [ "$opt" = "networking" ] ; then
 		networking ;  main
@@ -543,6 +571,8 @@ select opt in $MENU ; do
         nftiptables ; main
 	elif [ "$opt" = "logs" ] ; then
         logs ; main
+    elif [ "$opt" = "acceptlogs" ] ; then
+        acceptlogs_menu ; main
 	elif [ "$opt" = "networkdpi" ] ; then
 		show_netdpi ; main
     elif [ "$opt" = "export_conf" ] ; then
@@ -555,6 +585,11 @@ select opt in $MENU ; do
 	fi
 done
 }
+
+if [ "$1" = "accept-logs" ] || [ "$1" = "acceptlogs" ] ; then
+    acceptlogs "$2"
+    exit $?
+fi
 
 # Definisco altezza e larghezza
 rows=30
