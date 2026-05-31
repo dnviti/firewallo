@@ -20,14 +20,45 @@ printf "\n$CATENA..."
 source $1
 source $2
 
+accept_logs_enabled() {
+    case "${ACCEPT_LOGS:-on}" in
+        1|on|ON|yes|YES|true|TRUE|enable|ENABLE|enabled|ENABLED)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+add_accept_rule_nft() {
+    local protocol="$1"
+    local port="$2"
+
+    if accept_logs_enabled ; then
+        $NFT "add rule ip filter $CATENA $protocol dport $port log prefix \"ACCEPTED $protocol $port $CATENA : \" counter accept"
+    else
+        $NFT "add rule ip filter $CATENA $protocol dport $port counter accept"
+    fi
+}
+
+add_accept_rule_ipt() {
+    local protocol="$1"
+    local port="$2"
+
+    if accept_logs_enabled ; then
+        $IPT -t filter -A $CATENA -p $protocol --dport $port -j LOG --log-level info --log-prefix "ACCEPTED $protocol $port $CATENA :"
+    fi
+    $IPT -t filter -A $CATENA -p $protocol --dport $port -j ACCEPT
+}
+
 
 for i in $TCPPORT ; do
 printf "."
 if [ "$NFT" != "" ]  ; then
-    $NFT "add rule ip filter $CATENA tcp dport $i log prefix \"ACCEPTED tcp $i $CATENA : \" counter accept" ; printf "tcp $i"
+    add_accept_rule_nft "tcp" "$i" ; printf "tcp $i"
 elif [ "$IPT" != "" ] ; then
-    $IPT -t filter -A $CATENA -p tcp --dport $i -j LOG --log-level info --log-prefix "ACCEPTED tcp $i $CATENA :"
-    $IPT -t filter -A $CATENA -p tcp --dport $i -j ACCEPT ; printf "tcp $i"
+    add_accept_rule_ipt "tcp" "$i" ; printf "tcp $i"
 fi
 printf "."
 done
@@ -35,10 +66,9 @@ done
 for i in $UDPPORT ; do
 printf "."
 if [ "$NFT" != "" ]  ; then
-    $NFT "add rule ip filter $CATENA udp dport $i log prefix \"ACCEPTED udp $i $CATENA : \" counter accept"; printf "udp $i"
+    add_accept_rule_nft "udp" "$i"; printf "udp $i"
 elif [ "$IPT" != "" ] ; then
-    $IPT -t filter -A $CATENA -p udp --dport $i -j LOG --log-level info --log-prefix "ACCEPTED udp $i $CATENA :"
-    $IPT -t filter -A $CATENA -p udp --dport $i -j ACCEPT ; printf "udp $i"
+    add_accept_rule_ipt "udp" "$i" ; printf "udp $i"
 fi
 printf "."
 done
